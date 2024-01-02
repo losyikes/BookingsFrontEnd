@@ -1,0 +1,25 @@
+﻿.bg-color-white {
+    background-color: white;
+    color: #495057;
+}
+.bg-color-grey {
+    background-color: #ced4da;
+    color: #f8f9fa;
+}
+.weekDayHour{
+    height:100px;
+}
+.bg-appointment {
+    background-color: #ff7066;
+    color: #f8f9fa;
+}
+.bg-appointment-grey {
+    background-color: #eb5e57;
+    color: #f8f9fa;
+}
+.todaysDate {
+    border: 1px solid #ced4da;
+}
+.weekDay {
+    border-bottom: 1px solid #ced4da;
+}

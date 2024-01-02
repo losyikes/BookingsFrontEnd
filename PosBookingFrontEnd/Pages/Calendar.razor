@@ -1,0 +1,132 @@
+﻿@page "/calendar";
+
+@using PosBookingFrontEnd.Model
+@using PosBookingFrontEnd.Model.Requests
+@using PosBookingFrontEnd.Pages.Components.Calendar;
+@using System.Collections.ObjectModel
+@using System.Text.Json;
+@using System.Net.Http
+@using System.Text;
+@inject HttpClient Http
+
+
+<div class="bookings-top-bar">
+    <h3>Bookings</h3>
+</div>
+
+<div class="calendar w-100 h-100 d-flex flex-row">
+    
+    @for(int i = 0; i < 7; i++)
+    {
+        <CalendarWeekDay Date="@startOfWeek.AddDays(i)" OpeningTime="@openingHour" ClosingTime="@closingHour" OnTimeSelected="timeSelected" @bind-CurrentBookings="@currentBookings" />
+    }
+    <CalendarDetails @bind-SelectedBooking=@selectedBooking BookingTypes="@bookingTypes" NextUnavailibleTime="@nextUnavailibleTime" SelectedTime="@selectedDate" OnInsertClicked="insertClicked" OnSaveClicked="saveClicked"/>
+</div>
+
+@code {
+    private TimeOnly openingHour = new TimeOnly(08, 00);
+    private TimeOnly closingHour = new TimeOnly(17, 00);
+    private List<DateTime> weekDaysDates = new List<DateTime>();
+    private DateTime startOfWeek = DateTime.Today.AddDays(DayOfWeek.Monday - DateTime.Now.DayOfWeek);
+    private DateTime selectedDate { get; set; } = DateTime.Now;
+    private Booking? selectedBooking { get; set; } = null;
+    private DateTime nextUnavailibleTime;
+    private List<Booking> currentBookings { get; set; } = new List<Booking>();
+    private List<BookingType> bookingTypes { get; set; } = new List<BookingType>();
+    protected override async Task OnInitializedAsync()
+    {
+        DateTime endOfWeek = startOfWeek.AddDays(7);
+        currentBookings = await GetBookings(startOfWeek, endOfWeek);
+        bookingTypes = await GetBookingTypes();
+        nextUnavailibleTime = DateTime.Today.Add(closingHour.ToTimeSpan());
+        //StateHasChanged();
+    }
+    private void insertClicked(Booking booking)
+    {
+        var dump = JsonSerializer.Serialize(booking);
+        Console.WriteLine("insert:");
+        Console.WriteLine(dump);
+        InsertBooking(booking);
+    }
+    private void saveClicked(Booking booking)
+    {
+        var dump = JsonSerializer.Serialize(booking);
+        Console.WriteLine("save:");
+        Console.WriteLine(dump);
+        SaveBooking(booking);
+    }
+    private void timeSelected(DateTime selectionDate)
+    {
+        if(selectionDate >= DateTime.MinValue)
+            selectedDate = selectionDate;
+        if(currentBookings.Any(x => x.StartTime <= selectedDate && x.EndTime > selectedDate))
+        {
+            selectedBooking = currentBookings.SingleOrDefault(x => x.StartTime <= selectedDate && x.EndTime > selectedDate);
+        }
+        else
+        {
+            selectedBooking = null;
+        }
+
+        List<Booking> nextBookings = currentBookings.Where(x => x.StartTime.Date == selectedDate.Date && x.StartTime > selectedDate).OrderBy(x => x.StartTime).ToList();
+        if (nextBookings.Count > 0)
+        {
+            nextUnavailibleTime = nextBookings.First().StartTime;
+        }
+        else
+        {
+            nextUnavailibleTime = selectedDate.Date.Add(closingHour.ToTimeSpan());
+        }
+        Console.WriteLine(nextUnavailibleTime);
+    }
+    async Task<List<Booking>> GetBookings(DateTime startTime, DateTime endTime)
+    {
+        string uri = string.Format("api/Booking?StartTime={0}&EndTime={1}", startTime.ToUniversalTime().ToString(), endTime.ToUniversalTime().ToString());
+        List<Booking> result = await Http.GetFromJsonAsync<List<Booking>>(uri);
+        return result;
+    }
+    async Task<List<BookingType>> GetBookingTypes()
+    {
+        List<BookingType> result = await Http.GetFromJsonAsync<List<BookingType>>("api/BookingType");
+        return result;
+    }
+    async Task InsertBooking(Booking booking)
+    {
+        PostBookingRequest data = new PostBookingRequest()
+            {
+                TypeId = booking.Type.Id,
+                CustomerName = booking.CustomerName,
+                CustomerPhone = booking.CustomerPhone,
+                EndTime = booking.EndTime,
+                StartTime = booking.StartTime,
+                Note = booking.Note
+            };
+        string uri = "/api/booking";
+        var json = JsonSerializer.Serialize(data);
+        var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
+        var result = await Http.PostAsync(uri, stringContent);
+
+    }
+    async Task SaveBooking(Booking booking)
+    {
+        if(booking.Id != null)
+        {
+            UpdateBookingRequest data = new UpdateBookingRequest()
+                {
+                    Id = booking.Id.Value,
+                    CustomerName = booking.CustomerName,
+                    CustomerPhone = booking.CustomerPhone,
+                    StartTime = booking.StartTime,
+                    EndTime = booking.EndTime,
+                    TypeId = booking.Type.Id,
+                    Note = booking.Note
+                };
+            string uri = "/api/booking";
+            var json = JsonSerializer.Serialize<UpdateBookingRequest>(data);
+            var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
+            var result = await Http.PutAsync(uri, stringContent);
+        }
+        
+        
+    }
+}

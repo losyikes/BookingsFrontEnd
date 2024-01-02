@@ -1,0 +1,139 @@
+﻿@using PosBookingFrontEnd.Model
+@using System.Collections.ObjectModel
+@using System.Collections.Specialized
+
+
+<div class="weekDay d-flex flex-column w-25 h-100 m-2 @getTodayClassName()">
+    <div class="dayHeader d-flex flex-row justify-content-between m-1">
+        <p class="align-self-start">@WeekDayName</p>
+        <p class="align-self-end">@formattedDate</p>
+    </div>
+    
+    <div class="">
+        @for(int i = openingHour; i < closingHour; i++)
+        {
+            TimeOnly currentTime = OpeningTime.AddHours(i - openingHour);
+            bool shouldHaveGreyBackground = currentTime.Hour % 2 != 0;
+            <div class="w-95 weekDayHour m-2">
+                <div class="weekDayHalfHour h-50 d-flex flex-row justify-content-between @getBackgroundClassName(shouldHaveGreyBackground,Date.Date.Add(currentTime.ToTimeSpan()))" @onclick="(e => timeClicked(e, Date, currentTime))">
+                    <p class="text-start p-1 ">
+                        @currentTime.ToString("HH:mm")
+                    </p>
+                    <p class="text-end p-1 booking-header">
+                        @getBookingHeader(Date.Add(currentTime.ToTimeSpan()))
+                    </p>
+                </div>
+                <div class="weekDayHalfHour h-50 d-flex flex-row justify-content-between @getBackgroundClassName(shouldHaveGreyBackground, Date.Date.AddMinutes(30).Add(currentTime.ToTimeSpan()))" @onclick="(e =>timeClicked(e, Date, currentTime.AddMinutes(30)))">
+                    <p class="text-start p-1 ">
+                        @currentTime.AddMinutes(30).ToString("HH:mm")
+                    </p>
+                    <p class="text-end p-1 booking-header flex-row">
+                        @getBookingHeader(Date.Date.AddMinutes(30).Add(currentTime.ToTimeSpan()))
+                    </p>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+@code {
+    private string WeekDayName
+    {
+        get
+        {
+            return Date.DayOfWeek.ToString();
+        }
+    }
+    private string formattedDate
+    {
+        get
+        {
+            return Date.ToString("dd/MM");
+        }
+    }
+    private ObservableCollection<Booking> currentBookings = new ObservableCollection<Booking>();
+
+    [Parameter]
+    public DateTime Date { get; set; }
+    [Parameter]
+    public TimeOnly OpeningTime { get; set; }
+    [Parameter]
+    public TimeOnly ClosingTime { get; set; }
+    [Parameter]
+    public List<Booking> CurrentBookings { get; set; } = new List<Booking>();
+
+    [Parameter]
+    public EventCallback<List<Booking>> CurrentBookingsChanged { get; set; }
+    [Parameter]
+    public EventCallback<DateTime> OnTimeSelected { get; set; }
+    private string getTodayClassName()
+    {
+        if(Date.Date == DateTime.Now.Date)
+        {
+            return "todaysDate";
+        }
+        return "";
+    }
+    private Task timeClicked(MouseEventArgs e, DateTime clickedDate, TimeOnly clickedTime)
+    {
+        DateTime clickedDateTime = clickedDate.Date.Add(clickedTime.ToTimeSpan());
+        Console.WriteLine("ClickedTime: " + clickedTime);
+        return OnTimeSelected.InvokeAsync(clickedDateTime);
+    }
+    private int openingHour
+    {
+        get
+        {
+            return OpeningTime.Hour;
+        }
+    }
+    private int closingHour
+    {
+        get
+        {
+            return ClosingTime.Hour;
+        }
+    }
+
+
+    private string getBackgroundClassName(bool shouldHaveGreyBackground, DateTime startTime)
+    {
+        if (CurrentBookings != null)
+        {
+            if(CurrentBookings.Count > 0)
+            {
+                int u = 0;
+            }
+            DateTime startHalfHour = startTime;
+            DateTime endHalfHour = startTime.AddMinutes(30);
+            if (CurrentBookings.Any(x => x.StartTime <= startHalfHour && x.EndTime >= endHalfHour))
+            {
+                if(shouldHaveGreyBackground)
+                    return "bg-appointment-grey";
+                else
+                {
+                    return "bg-appointment";
+                }
+            }
+            else if (shouldHaveGreyBackground)
+            {
+                return "bg-color-grey";
+            }
+        }
+        else if (shouldHaveGreyBackground)
+        {
+            return "bg-color-grey";
+        }
+        return "";
+    }
+    private string getBookingHeader(DateTime startTime)
+    {
+        Booking? currentBooking = CurrentBookings?.FirstOrDefault(x => x.StartTime == startTime);
+        if(currentBooking != null)
+        {
+            return currentBooking.CustomerName + " - " + currentBooking.Type.Name;
+        }
+        return "";
+    }
+   
+    
+}
