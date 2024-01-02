@@ -2,11 +2,12 @@
 
 @using PosBookingFrontEnd.Model
 @using PosBookingFrontEnd.Model.Requests
-@using PosBookingFrontEnd.Pages.Components.Calendar;
+@using PosBookingFrontEnd.Pages.Components.Calendar
+@using PosBookingFrontEnd.Pages.Components
 @using System.Collections.ObjectModel
-@using System.Text.Json;
+@using System.Text.Json
 @using System.Net.Http
-@using System.Text;
+@using System.Text
 @using PosBookingFrontEnd.Helpers
 
 @inject SessionStorageAccessor SessionStorageAccessor
@@ -30,6 +31,7 @@
         <CalendarWeekDay Date="@startOfWeek.AddDays(i)" OpeningTime="@openingHour" ClosingTime="@closingHour" OnTimeSelected="timeSelected" @bind-CurrentBookings="@currentBookings" />
     }
     <CalendarDetails @bind-SelectedBooking=@selectedBooking BookingTypes="@bookingTypes" NextUnavailibleTime="@nextUnavailibleTime" SelectedTime="@selectedTime" OnInsertClicked="insertClicked" OnSaveClicked="saveClicked" OnDeleteClicked="deleteClicked" />
+    <ErrorModal @ref="@modal" Title="@errorModalTitle" ErrorText="@errorModalMessage"/>
 </div>
 
 @code {
@@ -43,6 +45,10 @@
     private List<Booking> currentBookings { get; set; } = new List<Booking>();
     private List<BookingType> bookingTypes { get; set; } = new List<BookingType>();
     private DateTime currentDate { get; set; } = DateTime.Today;
+    private string errorModalTitle { get; set; } = "Error";
+    private string errorModalMessage { get; set; } = "";
+    private bool showErrorModal { get; set; } = false;
+    private ErrorModal modal { get; set; }
     protected override async Task OnInitializedAsync()
     {
         string? sessionDate = await SessionStorageAccessor.GetValueAsync<string>("currentDate");
@@ -95,6 +101,8 @@
 
     private void timeSelected(DateTime selectionDate)
     {
+        errorModalMessage = "test Message";
+        
         if(selectionDate >= DateTime.MinValue)
             selectedTime = selectionDate;
         if (currentBookings.Any(x => x.StartTime <= selectedTime && x.EndTime > selectedTime))
@@ -121,6 +129,7 @@
     {
         string uri = string.Format("api/Booking?StartTime={0}&EndTime={1}", startTime.ToUniversalTime().ToString(), endTime.ToUniversalTime().ToString());
         List<Booking>? result = await Http.GetFromJsonAsync<List<Booking>>(uri);
+
         return result ?? new List<Booking>();
     }
     async Task<List<BookingType>?> GetBookingTypes()
@@ -140,14 +149,22 @@
                 Note = booking.Note
             };
         string uri = "/api/booking";
-        var json = JsonSerializer.Serialize(data);
-        var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
-        var result = await Http.PostAsync(uri, stringContent);
+        string json = JsonSerializer.Serialize(data);
+        StringContent stringContent = new StringContent(json, Encoding.UTF8, "application/json");
+        HttpResponseMessage result = await Http.PostAsync(uri, stringContent);
+        if (result.IsSuccessStatusCode)
+        {
+            DateTime endOfWeek = startOfWeek.AddDays(7);
 
-        DateTime endOfWeek = startOfWeek.AddDays(7);
+            currentBookings = await GetBookings(startOfWeek, endOfWeek);
+            StateHasChanged();
+        }
+        else
+        {
+            errorModalMessage = result?.ReasonPhrase ?? "Error inserting Booking";
+            modal.Open();
+        }
 
-        currentBookings = await GetBookings(startOfWeek, endOfWeek);
-        StateHasChanged();
     }
     async Task SaveBooking(Booking booking)
     {
@@ -164,15 +181,23 @@
                     Note = booking.Note
                 };
             string uri = "/api/booking";
-            var json = JsonSerializer.Serialize<UpdateBookingRequest>(data);
-            var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
-            var result = await Http.PutAsync(uri, stringContent);
-            var resultContent = await result.Content.ReadAsStringAsync();
-            DateTime endOfWeek = startOfWeek.AddDays(7);
+            string json = JsonSerializer.Serialize<UpdateBookingRequest>(data);
+            StringContent stringContent = new StringContent(json, Encoding.UTF8, "application/json");
+            HttpResponseMessage result = await Http.PutAsync(uri, stringContent);
+            string resultContent = await result.Content.ReadAsStringAsync();
+            if (result.IsSuccessStatusCode)
+            {
+                DateTime endOfWeek = startOfWeek.AddDays(7);
 
-            currentBookings = await GetBookings(startOfWeek, endOfWeek);
-            selectedBooking = currentBookings.FirstOrDefault(x => x.Id == booking.Id);
-            StateHasChanged();
+                currentBookings = await GetBookings(startOfWeek, endOfWeek);
+                selectedBooking = currentBookings.FirstOrDefault(x => x.Id == booking.Id);
+                StateHasChanged();
+            }
+            else
+            {
+                errorModalMessage = result?.ReasonPhrase ?? "Error saving Booking";
+                modal.Open();
+            }
 
         }
 
@@ -182,10 +207,19 @@
     {
         string uri = string.Format("/api/booking?Id={0}", id);
 
-        var result = await Http.DeleteAsync(uri);
+        HttpResponseMessage result = await Http.DeleteAsync(uri);
         DateTime endOfWeek = startOfWeek.AddDays(7);
-        currentBookings = await GetBookings(startOfWeek, endOfWeek);
-        selectedBooking = null;
-        StateHasChanged();
+        if (result.IsSuccessStatusCode)
+        {
+            currentBookings = await GetBookings(startOfWeek, endOfWeek);
+            selectedBooking = null;
+            StateHasChanged();
+        }
+        else
+        {
+            errorModalMessage = result?.ReasonPhrase ?? "Error deleting Booking";
+            modal.Open();
+        }
+
     }
 }
