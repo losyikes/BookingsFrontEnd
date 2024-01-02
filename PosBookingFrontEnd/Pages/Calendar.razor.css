@@ -2,4 +2,11 @@
 .bookings-top-bar {
     border-bottom: 1px solid #d6d5d5;
 }
-
+.buttonBar{
+    margin-right:300px;
+    margin-left:auto;
+    
+}
+.weekButton {
+    margin-left: 10px;
+}

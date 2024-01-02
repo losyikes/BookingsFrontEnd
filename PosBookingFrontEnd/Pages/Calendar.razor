@@ -7,11 +7,20 @@
 @using System.Text.Json;
 @using System.Net.Http
 @using System.Text;
+@using PosBookingFrontEnd.Helpers
+
+@inject SessionStorageAccessor SessionStorageAccessor
 @inject HttpClient Http
+@inject NavigationManager navManager;
 
-
-<div class="bookings-top-bar">
+<div class="bookings-top-bar  d-flex flex-row">
     <h3>Bookings</h3>
+    <div class="buttonBar">
+        <button type="button" class="btn btn-primary weekButton" @onclick="prevWeekBtnClicked">Prev Week</button>
+        <button type="button" class="btn btn-primary weekButton" @onclick="nextWeekBtnClicked">Next Week</button>
+
+    </div>
+    
 </div>
 
 <div class="calendar w-100 h-100 d-flex flex-row">
@@ -20,76 +29,104 @@
     {
         <CalendarWeekDay Date="@startOfWeek.AddDays(i)" OpeningTime="@openingHour" ClosingTime="@closingHour" OnTimeSelected="timeSelected" @bind-CurrentBookings="@currentBookings" />
     }
-    <CalendarDetails @bind-SelectedBooking=@selectedBooking BookingTypes="@bookingTypes" NextUnavailibleTime="@nextUnavailibleTime" SelectedTime="@selectedDate" OnInsertClicked="insertClicked" OnSaveClicked="saveClicked"/>
+    <CalendarDetails @bind-SelectedBooking=@selectedBooking BookingTypes="@bookingTypes" NextUnavailibleTime="@nextUnavailibleTime" SelectedTime="@selectedTime" OnInsertClicked="insertClicked" OnSaveClicked="saveClicked" OnDeleteClicked="deleteClicked" />
 </div>
 
 @code {
     private TimeOnly openingHour = new TimeOnly(08, 00);
     private TimeOnly closingHour = new TimeOnly(17, 00);
     private List<DateTime> weekDaysDates = new List<DateTime>();
-    private DateTime startOfWeek = DateTime.Today.AddDays(DayOfWeek.Monday - DateTime.Now.DayOfWeek);
-    private DateTime selectedDate { get; set; } = DateTime.Now;
+    private DateTime startOfWeek;
+    private DateTime selectedTime { get; set; } = DateTime.Now;
     private Booking? selectedBooking { get; set; } = null;
     private DateTime nextUnavailibleTime;
     private List<Booking> currentBookings { get; set; } = new List<Booking>();
     private List<BookingType> bookingTypes { get; set; } = new List<BookingType>();
-
+    private DateTime currentDate { get; set; } = DateTime.Today;
     protected override async Task OnInitializedAsync()
     {
+        string? sessionDate = await SessionStorageAccessor.GetValueAsync<string>("currentDate");
+        if(sessionDate != null)
+        {
+            currentDate = JsonSerializer.Deserialize<DateTime>(sessionDate);
+        }
+        startOfWeek = currentDate.AddDays(DayOfWeek.Monday - DateTime.Now.DayOfWeek);
         DateTime endOfWeek = startOfWeek.AddDays(7);
+        nextUnavailibleTime = currentDate.Add(closingHour.ToTimeSpan());
+
         currentBookings = await GetBookings(startOfWeek, endOfWeek);
         bookingTypes = await GetBookingTypes();
-        nextUnavailibleTime = DateTime.Today.Add(closingHour.ToTimeSpan());
+        List<Booking> nextBookings = currentBookings.Where(x => x.StartTime.Date == DateTime.Now.Date && x.StartTime > DateTime.Now).OrderBy(x => x.StartTime).ToList();
+        if (nextBookings.Count > 0)
+        {
+            nextUnavailibleTime = nextBookings.First().StartTime;
+        }
+
+    }
+    private async void nextWeekBtnClicked()
+    {
+        currentDate = currentDate.AddDays(7);
+        string jsonDate = JsonSerializer.Serialize(currentDate);
+        await SessionStorageAccessor.SetValueAsync("currentDate", jsonDate);
+        //StateHasChanged();
+        navManager.NavigateTo(navManager.Uri, forceLoad: true);
+    }
+    private async void prevWeekBtnClicked()
+    {
+        currentDate = currentDate.AddDays(-7);
+        string jsonDate = JsonSerializer.Serialize(currentDate);
+        await SessionStorageAccessor.SetValueAsync("currentDate", jsonDate);
+        navManager.NavigateTo(navManager.Uri, forceLoad: true);
+
         //StateHasChanged();
     }
-    private void insertClicked(Booking booking)
+    private async void insertClicked(Booking booking)
     {
-        var dump = JsonSerializer.Serialize(booking);
-        Console.WriteLine("insert:");
-        Console.WriteLine(dump);
-        InsertBooking(booking);
+        await InsertBooking(booking);
     }
-    private void saveClicked(Booking booking)
+    private async void saveClicked(Booking booking)
     {
-        var dump = JsonSerializer.Serialize(booking);
-        Console.WriteLine("save:");
-        Console.WriteLine(dump);
-        SaveBooking(booking);
+        await SaveBooking(booking);
     }
+    private async void deleteClicked(int id)
+    {
+        await DeleteBooking(id);
+    }
+
     private void timeSelected(DateTime selectionDate)
     {
         if(selectionDate >= DateTime.MinValue)
-            selectedDate = selectionDate;
-        if(currentBookings.Any(x => x.StartTime <= selectedDate && x.EndTime > selectedDate))
+            selectedTime = selectionDate;
+        if (currentBookings.Any(x => x.StartTime <= selectedTime && x.EndTime > selectedTime))
         {
-            selectedBooking = currentBookings.SingleOrDefault(x => x.StartTime <= selectedDate && x.EndTime > selectedDate);
+            selectedBooking = currentBookings.SingleOrDefault(x => x.StartTime <= selectedTime && x.EndTime > selectedTime);
         }
         else
         {
             selectedBooking = null;
         }
 
-        List<Booking> nextBookings = currentBookings.Where(x => x.StartTime.Date == selectedDate.Date && x.StartTime > selectedDate).OrderBy(x => x.StartTime).ToList();
+        List<Booking> nextBookings = currentBookings.Where(x => x.StartTime.Date == selectedTime.Date && x.StartTime > selectedTime).OrderBy(x => x.StartTime).ToList();
         if (nextBookings.Count > 0)
         {
             nextUnavailibleTime = nextBookings.First().StartTime;
         }
         else
         {
-            nextUnavailibleTime = selectedDate.Date.Add(closingHour.ToTimeSpan());
+            nextUnavailibleTime = selectedTime.Date.Add(closingHour.ToTimeSpan());
         }
         Console.WriteLine(nextUnavailibleTime);
     }
-    async Task<List<Booking>> GetBookings(DateTime startTime, DateTime endTime)
+    async Task<List<Booking>?> GetBookings(DateTime startTime, DateTime endTime)
     {
         string uri = string.Format("api/Booking?StartTime={0}&EndTime={1}", startTime.ToUniversalTime().ToString(), endTime.ToUniversalTime().ToString());
-        List<Booking> result = await Http.GetFromJsonAsync<List<Booking>>(uri);
-        return result;
+        List<Booking>? result = await Http.GetFromJsonAsync<List<Booking>>(uri);
+        return result ?? new List<Booking>();
     }
-    async Task<List<BookingType>> GetBookingTypes()
+    async Task<List<BookingType>?> GetBookingTypes()
     {
-        List<BookingType> result = await Http.GetFromJsonAsync<List<BookingType>>("api/BookingType");
-        return result;
+        List<BookingType>? result = await Http.GetFromJsonAsync<List<BookingType>>("api/BookingType");
+        return result ?? new List<BookingType>();
     }
     async Task InsertBooking(Booking booking)
     {
@@ -134,10 +171,21 @@
             DateTime endOfWeek = startOfWeek.AddDays(7);
 
             currentBookings = await GetBookings(startOfWeek, endOfWeek);
-            StateHasChanged();
             selectedBooking = currentBookings.FirstOrDefault(x => x.Id == booking.Id);
+            StateHasChanged();
+
         }
-        
-        
+
+
+    }
+    async Task DeleteBooking(int id)
+    {
+        string uri = string.Format("/api/booking?Id={0}", id);
+
+        var result = await Http.DeleteAsync(uri);
+        DateTime endOfWeek = startOfWeek.AddDays(7);
+        currentBookings = await GetBookings(startOfWeek, endOfWeek);
+        selectedBooking = null;
+        StateHasChanged();
     }
 }

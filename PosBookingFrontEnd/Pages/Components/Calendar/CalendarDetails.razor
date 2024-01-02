@@ -1,86 +1,43 @@
 ﻿@using PosBookingFrontEnd.Model
 @using System.Collections.ObjectModel
 
+
 <div class="calendar-details d-flex flex-column">
     <h3>CalendarDetails</h3>
-    <div class="">
-        <form class="details-form">
-            <div class="form-group">
-                <label for="customerName">CustomerName</label>
-                <input type="text" class="form-control" id="customerName" @bind="customerName" />
-            </div>
-            <div class="form-group">
-                <label for="customerPhone">CustomerPhone</label>
-                <input type="text" class="form-control" id="customerPhone" @bind="customerPhone" />
-            </div>
-            <div class="form-group">
-                <label for="type">Booking type</label>
-                <select class="form-select" id="type" @bind="bookingTypeId">
-                    @foreach(BookingType bookingType in BookingTypes)
-                    {
-                        <option value="@bookingType.Id">@bookingType.Name</option>
-                    }
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="startTime">Startime</label>
-                <input type="text" class="form-control" id="startTime" @bind="startTime" />
-            </div>
-            <div class="form-group">
-                <label for="duration">Duration</label>
-                <select class="form-select" id="duration" @bind="duration">
-                    @for (TimeSpan t = new TimeSpan(0, 30, 0); t <= (NextUnavailibleTime - (SelectedBooking?.StartTime ?? SelectedTime)); t = t.Add(new TimeSpan(0, 30, 0)))
-                    {
-                        <option value="@t">@t</option>
-                    }
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="note">Note</label><br />
-                <textarea class="form-control" id="note" @bind="note"></textarea>
-            </div>
-        
-            <div class="form-group">
-                @if(SelectedBooking == null)
-                {
-                    
-                    <button class="btn btn-primary" type="button" onclick="@(() => insertClicked())">Insert</button>
-                }
-                else
-                {
-                    <button class="btn btn-primary" type="button" onclick="@(() => saveClicked())">Save</button>
-
-                }
-            </div>
-        </form>
-        @* <EditForm Model="@bookingToEdit">
+    <div>
+      
+        <EditForm EditContext="@editContext" onch>
+            <DataAnnotationsValidator />
+            <ValidationSummary />
             <div id="form-group">
                 <label for="customerName" />
-                <InputText @bind-Value="bookingToEdit.CustomerName" class="form-control" id="CustomerName" />
-            </div>
+                <InputText @bind-Value="bookingToEdit.CustomerName" class="form-control" id="CustomerName" onchange="customerNameChange" />
+                <ValidationMessage For="@(() => bookingToEdit.CustomerName)" />
+           </div>
             <div class="form-group">
                 <label for="customerPhone">CustomerPhone</label>
                 <InputText class="form-control" id="customerPhone" @bind-Value="bookingToEdit.CustomerPhone" />
             </div>
             <div class="form-group">
                 <label for="type">Booking type</label>
-                <InputSelect class="form-select" id="type" @bind-Value="bookingToEdit.Type.Id">
+                <InputSelect class="form-select" id="type" @bind-Value="bookingToEdit.Type">
                     @foreach (BookingType bookingType in BookingTypes)
                     {
-                        <option value="@bookingType.Id">@bookingType.Name</option>
+                        <option value="@bookingType">@bookingType.Name</option>
                     }
                 </InputSelect>
             </div>
             <div class="form-group">
                 <label for="startTime">Startime</label>
-                <InputDate class="form-control" id="startTime" @bind-Value="bookingToEdit.StartTime"/>
-            </div>
-            <div class="form-group">
+                <InputText class="form-control" id="startTime" @bind-Value="bookingToEdit.StartTimeString" />
+            </div> 
+           <div class="form-group">
                 <label for="duration">Duration</label>
-                <InputSelect class="form-select" id="duration" @bind-Value="bookingToEdit.Duration">
+                <InputSelect class="form-select" id="duration" @bind-Value="bookingToEdit.DurationString">
+                    <option disabled selected value> select a duration </option>
                     @for (TimeSpan t = new TimeSpan(0, 30, 0); t <= (NextUnavailibleTime - (SelectedBooking?.StartTime ?? SelectedTime)); t = t.Add(new TimeSpan(0, 30, 0)))
                     {
-                        <option value="@t">@t</option>
+                    <option value="@t.ToString("hh\\:mm")">@t</option>
                     }
                 </InputSelect>
             </div>
@@ -88,8 +45,20 @@
                 <label for="note">Note</label><br />
                 <InputText class="form-control" id="note" @bind-Value="bookingToEdit.Note" />
             </div>
+            <div class="form-group detailsButtonBar">
+                @if (SelectedBooking == null)
+                {
 
-        </EditForm> *@
+                    <button class="btn btn-primary" type="button" onclick="@(() => insertClicked())">Insert</button>
+                }
+                else
+                {
+                    <button class="btn btn-primary" type="button" onclick="@(() => saveClicked())">Save</button>
+                    <button class="btn btn-danger" type="button" onclick="@(() => deleteClicked())">Delete</button>
+
+                }
+            </div>
+        </EditForm>
     </div>
 </div>
 @code {
@@ -102,33 +71,46 @@
     [Parameter]
     public EventCallback<Booking> OnSaveClicked { get; set; }
     [Parameter]
+    public EventCallback<int> OnDeleteClicked { get; set; }
+    [Parameter]
     public List<BookingType> BookingTypes { get; set; } = new List<BookingType>();
     [Parameter]
     public DateTime NextUnavailibleTime { get; set; }
     [Parameter]
     public DateTime SelectedTime { get; set; }
-    private Booking bookingToEdit{ get; set; } = new Booking();
+    private EditableBooking bookingToEdit { get; set; } = new EditableBooking(){Type = new BookingType(){Id= 2, Name= "HairCut"}, StartTime=DateTime.Now};
+    private EditContext editContext;
+    private void EditContext_OnFieldChanged(object sender,
+            FieldChangedEventArgs e)
+    {
+        editContext.Validate();
 
+
+    }
+    private void customerNameChange()
+    {
+        editContext.Validate();
+    }
     protected override void OnParametersSet()
     {
         Console.WriteLine("parameter set");
-        customerName = SelectedBooking?.CustomerName ?? "";
-        customerPhone = SelectedBooking?.CustomerPhone ?? "";
-        bookingTypeId = SelectedBooking?.Type?.Id ?? 1;
-        startTime = SelectedBooking?.StartTime ?? SelectedTime;
-        duration = SelectedBooking?.EndTime - SelectedBooking?.StartTime ?? new TimeSpan(0, 30, 0);
-        note = SelectedBooking?.Note ?? "";
-        // StateHasChanged();
+        bookingToEdit = new EditableBooking()
+            {
+                Id = SelectedBooking?.Id,
+                CustomerName = SelectedBooking?.CustomerName ?? "",
+                CustomerPhone = SelectedBooking?.CustomerPhone ?? "",
+                Type = BookingTypes.FirstOrDefault(x => x.Id == (SelectedBooking?.Type?.Id ?? 1)),
+                StartTime = SelectedBooking?.StartTime ?? SelectedTime,
+                Duration = SelectedBooking?.EndTime - SelectedBooking?.StartTime ?? new TimeSpan(0, 30, 0),
+                Note = SelectedBooking?.Note ?? ""
+            };
+
+        StateHasChanged();
     }
     protected override async Task OnInitializedAsync()
     {
-        // Console.WriteLine("on init");
-        // customerName = SelectedBooking?.CustomerName ?? "";
-        // customerPhone = SelectedBooking?.CustomerPhone ?? "";
-        // bookingTypeId = SelectedBooking?.Type?.Id ?? 0;
-        // startTime = SelectedBooking?.StartTime ?? SelectedTime;
-        // duration = SelectedBooking?.EndTime - SelectedBooking?.StartTime ?? new TimeSpan(0, 30, 0);
-        // note = SelectedBooking?.Note ?? "";
+        editContext = new EditContext(bookingToEdit);
+        editContext.OnFieldChanged += EditContext_OnFieldChanged;
     }
     private string customerName { get; set; }
     private string customerPhone { get; set; }
@@ -138,30 +120,48 @@
     private string note { get; set; }
     private Task saveClicked()
     {
-        Booking changedBooking = new Booking()
-            {
-                Id = SelectedBooking.Id,
-                CustomerName = customerName,
-                CustomerPhone = customerPhone,
-                StartTime = startTime,
-                EndTime = startTime.Add(duration),
-                Type = BookingTypes.FirstOrDefault(x => x.Id == bookingTypeId),
-                Note = note
-            };
+        if (editContext.Validate())
+        {
+            Booking changedBooking = new Booking()
+                {
+                    Id = bookingToEdit.Id,
+                    CustomerName = bookingToEdit.CustomerName,
+                    CustomerPhone = bookingToEdit.CustomerPhone,
+                    StartTime = bookingToEdit.StartTime,
+                    EndTime = bookingToEdit.StartTime.Add(bookingToEdit.Duration),
+                    Type = bookingToEdit.Type,
+                    Note = bookingToEdit.Note
+                };
+            return OnSaveClicked.InvokeAsync(changedBooking);
 
-        return OnSaveClicked.InvokeAsync(changedBooking);
+        }
+        return Task.CompletedTask;
+
     }
     private Task insertClicked()
     {
-        Booking changedBooking = new Booking()
-            {
-                CustomerName = customerName,
-                CustomerPhone = customerPhone,
-                StartTime = startTime,
-                EndTime = startTime.Add(duration),
-                Type = BookingTypes.FirstOrDefault(x => x.Id == bookingTypeId),
-                Note = note
-            };
-        return OnInsertClicked.InvokeAsync(changedBooking);
+        if (editContext.Validate())
+        {
+            Booking changedBooking = new Booking()
+                {
+                    CustomerName = bookingToEdit.CustomerName,
+                    CustomerPhone = bookingToEdit.CustomerPhone,
+                    StartTime = bookingToEdit.StartTime,
+                    EndTime = bookingToEdit.StartTime.Add(bookingToEdit.Duration),
+                    Type = bookingToEdit.Type,
+                    Note = bookingToEdit.Note
+                };
+            return OnInsertClicked.InvokeAsync(changedBooking);
+        }
+        return Task.CompletedTask;
+
+    }
+    private Task deleteClicked()
+    {
+        if(bookingToEdit.Id != null)
+        {
+            return OnDeleteClicked.InvokeAsync(bookingToEdit.Id.Value);
+        }
+        return Task.CompletedTask;
     }
 }
