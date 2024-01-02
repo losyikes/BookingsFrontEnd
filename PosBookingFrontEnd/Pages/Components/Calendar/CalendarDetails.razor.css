@@ -11,3 +11,12 @@
     margin: .5rem;
     padding-left:10px;
 }
+.detailsButtonBar {
+    margin-top:10px;
+    margin-right:10px;
+    margin-left: auto;
+}
+
+.detailsBtn {
+    margin-left: 10px;
+}

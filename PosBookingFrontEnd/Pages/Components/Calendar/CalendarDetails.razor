@@ -43,15 +43,15 @@
                 <label for="note">Note</label><br />
                 <InputText class="form-control" id="note" @bind-Value="bookingToEdit.Note" />
             </div>
-            <div class="form-group detailsButtonBar">
+            <div class="form-group detailsButtonBar d-flex flex-row justify-content-end">
                 @if (SelectedBooking == null)
                 {
-                    <button class="btn btn-primary" type="button" onclick="@(() => insertClicked())">Insert</button>
+                    <button class="detailsBtn btn btn-primary" type="button" onclick="@(() => insertClicked())">Insert</button>
                 }
                 else
                 {
-                    <button class="btn btn-primary" type="button" onclick="@(() => saveClicked())">Save</button>
-                    <button class="btn btn-danger" type="button" onclick="@(() => deleteClicked())">Delete</button>
+                    <button class="detailsBtn btn btn-primary" type="button" onclick="@(() => saveClicked())">Save</button>
+                    <button class="detailsBtn btn btn-danger" type="button" onclick="@(() => deleteClicked())">Delete</button>
 
                 }
             </div>

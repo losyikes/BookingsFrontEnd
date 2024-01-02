@@ -100,10 +100,7 @@
         {
             DateTime startHalfHour = startTime;
             DateTime endHalfHour = startTime.AddMinutes(30);
-            if (CurrentBookings.Where(x => x.StartTime <= startHalfHour && x.EndTime >= endHalfHour).Count() == 0)
-            {
-                int i = 0;
-            }
+            
             if (CurrentBookings.Any(x => x.StartTime <= startHalfHour && x.EndTime >= endHalfHour))
             {
                 if(shouldHaveGreyBackground)
