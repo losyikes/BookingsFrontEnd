@@ -7,16 +7,12 @@ namespace PosBookingFrontEnd.Model
         
         
         public int? Id { get; set; }
-        [Required]
-        public BookingType? Type { get; set; }
-        [Required]
+        public BookingType Type { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
-        [MinLength(2, ErrorMessage = "Customer Name is to short")]
         public string? CustomerName { get; set; }
         public string? CustomerPhone { get; set; }
         public string? Note { get; set; }
-        [Required]
         public TimeSpan Duration { get; set; }
         public string DurationString
         {
@@ -34,10 +30,8 @@ namespace PosBookingFrontEnd.Model
             }
 
         }
-        public int BookingTypeId
-        {
-            get { return Type.Id; }
-        }
+        public int BookingTypeId { get; set; }
+        
         public string StartTimeString
         {
             get

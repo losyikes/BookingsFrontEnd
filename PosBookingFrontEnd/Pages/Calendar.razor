@@ -123,7 +123,6 @@
         {
             nextUnavailibleTime = selectedTime.Date.Add(closingHour.ToTimeSpan());
         }
-        Console.WriteLine(nextUnavailibleTime);
     }
     async Task<List<Booking>?> GetBookings(DateTime startTime, DateTime endTime)
     {

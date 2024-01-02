@@ -76,7 +76,6 @@
     private Task timeClicked(MouseEventArgs e, DateTime clickedDate, TimeOnly clickedTime)
     {
         DateTime clickedDateTime = clickedDate.Date.Add(clickedTime.ToTimeSpan());
-        Console.WriteLine("ClickedTime: " + clickedTime);
         return OnTimeSelected.InvokeAsync(clickedDateTime);
     }
     private int openingHour
